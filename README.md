@@ -39,13 +39,55 @@ ALIYUN_NAME_SPACE,ALIYUN_REGISTRY_USER，ALIYUN_REGISTRY_PASSWORD，ALIYUN_REGIS
 配置成环境变量
 
 ### 添加镜像
-打开images.txt文件，添加你想要的镜像 
-可以加tag，也可以不用(默认latest)<br>
-可添加 --platform=xxxxx 的参数指定镜像架构<br>
-可使用 k8s.gcr.io/kube-state-metrics/kube-state-metrics 格式指定私库<br>
-可使用 #开头作为注释<br>
+打开images.txt文件，添加你想要的镜像。支持以下格式：
+
+- 直接写镜像名，可带tag，不写tag默认latest<br>
+  例如：`nginx:latest`、`gdy666/lucky:latest`
+- 支持 `--platform=xxxxx` 参数指定镜像架构<br>
+  例如：`--platform=linux/arm64 xiaoyaliu/alis`
+- 支持私库地址<br>
+  例如：`k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0`
+- 支持 `#` 开头作为注释<br>
+  例如：`# xhofe/alist:latest`
+- **新增：支持自定义目标镜像名**，使用 `=>` 分隔源镜像和自定义名称<br>
+  例如：`xhofe/alist:latest => xhofe_alist:latest`
+
+提交文件后，自动进入Github Action构建。
+
+#### 自动命名规则
+默认情况下，程序会把源镜像的命名空间作为前缀加到镜像名称前，避免不同命名空间下同名镜像冲突。
+
+例如：
+```
+xhofe/alist
+xiaoyaliu/alist
+```
+会分别转存为：
+```
+xhofe_alist
+xiaoyaliu_alist
+```
+
+如果源镜像没有命名空间（例如 `nginx:latest`），则不会添加命名空间前缀，直接使用原镜像名。
+
+#### 自定义命名
+如果不想使用自动命名，或者希望完全指定目标镜像名，可以使用 `=>` 语法：
+```
+源镜像 => 目标镜像名:标签
+```
+
+例如：
+```
+xhofe/alist:latest => xhofe_alist:latest
+xiaoyaliu/alist:latest => xiaoyaliu_alist:latest
+k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0 => kube-state-metrics:v2.0.0
+```
+
+指定自定义命名后，最终推送的镜像名就是 `ALIYUN_NAME_SPACE/目标镜像名:标签`，不再自动添加命名空间前缀。
+
+如果同时使用了 `--platform`，平台前缀仍然会加在自定义名称前面，避免不同架构互相覆盖。
+
 ![](doc/images.png)
-文件提交后，自动进入Github Action构建
 
 ### 使用镜像
 回到阿里云，镜像仓库，点击任意镜像，可查看镜像状态。(可以改成公开，拉取镜像免登录)
@@ -60,18 +102,47 @@ shrimp-images 即 ALIYUN_NAME_SPACE(阿里云命名空间)<br>
 alpine 即 阿里云中显示的镜像名<br>
 
 ### 多架构
-需要在images.txt中用 --platform=xxxxx手动指定镜像架构
-指定后的架构会以前缀的形式放在镜像名字前面
+需要在images.txt中用 `--platform=xxxxx` 手动指定镜像架构。指定后的架构会以前缀的形式放在镜像名字前面。
+
+例如：
+```
+--platform=linux/arm64 xiaoyaliu/alis
+```
+最终镜像名会包含平台前缀，例如：
+```
+linux_arm64_xiaoyaliu_alis
+```
+
+如果同时使用自定义命名：
+```
+--platform=linux/arm64 xiaoyaliu/alis:latest => xiaoyaliu_alis_arm64:latest
+```
+最终镜像名为：
+```
+linux_arm64_xiaoyaliu_alis_arm64:latest
+```
+
 ![](doc/多架构.png)
 
 ### 镜像重名
-程序自动判断是否存在名称相同, 但是属于不同命名空间的情况。
-如果存在，会把命名空间作为前缀加在镜像名称前。
-例如:
+程序默认会将命名空间作为前缀加在镜像名称前，因此不同命名空间下的同名镜像不会冲突。
+
+例如：
 ```
 xhofe/alist
 xiaoyaliu/alist
 ```
+会分别转存为：
+```
+xhofe_alist
+xiaoyaliu_alist
+```
+
+如果希望完全自定义镜像名，可以使用上文的自定义命名语法：
+```
+xhofe/alist => my_alist
+```
+
 ![](doc/镜像重名.png)
 
 ### 定时执行
