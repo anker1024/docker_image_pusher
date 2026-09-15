@@ -4,6 +4,7 @@
 - 支持DockerHub, gcr.io, k8s.io, ghcr.io等任意仓库<br>
 - 支持最大40GB的大型镜像<br>
 - 使用阿里云的官方线路，速度快<br>
+- **自动跳过内容未变化的镜像，避免重复推送**<br>
 
 视频教程：https://www.bilibili.com/video/BV1Zn4y19743/
 
@@ -49,7 +50,7 @@ ALIYUN_NAME_SPACE,ALIYUN_REGISTRY_USER，ALIYUN_REGISTRY_PASSWORD，ALIYUN_REGIS
   例如：`k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0`
 - 支持 `#` 开头作为注释<br>
   例如：`# xhofe/alist:latest`
-- **新增：支持自定义目标镜像名**，使用 `=>` 分隔源镜像和自定义名称<br>
+- 支持自定义目标镜像名，使用 `=>` 分隔源镜像和自定义名称<br>
   例如：`xhofe/alist:latest => xhofe_alist:latest`
 
 提交文件后，自动进入Github Action构建。
@@ -144,6 +145,16 @@ xhofe/alist => my_alist
 ```
 
 ![](doc/镜像重名.png)
+
+### 避免重复推送
+每次运行 Action 时，程序都会先对比**源镜像**和**阿里云远端已存在镜像**的 config digest（镜像内容摘要）：
+
+- 如果两者一致，说明镜像内容没有变化，**直接跳过拉取和推送**，不消耗磁盘、网络和 Action 时间。
+- 如果远端不存在，或者 digest 不一致（说明上游已更新），才会执行拉取、打 tag、推送流程。
+
+整个过程通过 `docker manifest inspect` 完成，**不需要拉取镜像**，只走 registry API，因此判断本身几乎不消耗时间和空间。
+
+这让项目非常适合配置成定时执行（例如每天同步一次），即使上游镜像没有变化，也能零开销地确认同步状态。
 
 ### 定时执行
 修改/.github/workflows/docker.yaml文件
